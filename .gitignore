@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# Local IDE/editor
+.vscode/
+
+# Local runtime artifacts
+*.log
+server_run.log
+
+# Local database
+erros_pedido.db
+*.db
+
+# Local spreadsheets (sensitive/input data)
+data/*.xlsx

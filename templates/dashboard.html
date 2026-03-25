@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Erros de Pedido</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="left">
+    <div style="font-size:2rem">📋</div>
+    <div>
+      <h1>Dashboard — Erros de Pedido</h1>
+      <p>Última importação: {{ ultima_importacao }}</p>
+    </div>
+  </div>
+  <div class="badge-update">🗄️ Total no banco: {{ total_banco }} registros</div>
+</header>
+
+<div class="container">
+
+  <!-- Filtros -->
+  <div class="filter-bar">
+    <div class="filter-field date-field">
+      <label>De:</label>
+      <input type="text" id="dataInicio" placeholder="DD/MM/AAAA" value="{{ data_min }}">
+    </div>
+    <div class="filter-field date-field">
+      <label>Até:</label>
+      <input type="text" id="dataFim" placeholder="DD/MM/AAAA" value="{{ data_max }}">
+    </div>
+    <div class="filter-field wide-field">
+      <label>Fornecedor:</label>
+      <select id="filtroForn">
+        <option value="">Todos</option>
+        {% for f in fornecedores_lista %}
+        <option value="{{ f }}">{{ f }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field wide-field">
+      <label>Categoria:</label>
+      <select id="filtroCategoria">
+        <option value="">Todas</option>
+        {% for cat, _ in kpis.categorias %}
+        <option>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn" onclick="aplicarFiltros()">Filtrar</button>
+      <button class="btn-outline" onclick="limparFiltros()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- KPIs Principais -->
+  <div class="kpi-grid">
+    <div class="kpi-card red">
+      <div class="kpi-label">📊 Total de Erros</div>
+      <div class="kpi-value" id="kTotal">{{ kpis.total }}</div>
+      <div class="kpi-sub">registros no período</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">🚨 Categoria Mais Frequente</div>
+      <div class="kpi-value" id="kErroFreq">{{ kpis.categoria_mais_frequente[1] }}</div>
+      <div class="kpi-sub" id="kErroFreqSub">{{ kpis.categoria_mais_frequente[0][:25] }}{% if kpis.categoria_mais_frequente[0]|length > 25 %}...{% endif %}</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">🏢 Fornecedor com Mais Erros</div>
+      <div class="kpi-value" id="kFornMais">{{ kpis.fornecedor_mais_erros[1] }}</div>
+      <div class="kpi-sub" id="kFornMaisSub">{{ kpis.fornecedor_mais_erros[0][:25] }}{% if kpis.fornecedor_mais_erros[0]|length > 25 %}...{% endif %}</div>
+    </div>
+    <div class="kpi-card" style="border-left-color: #10b981;">
+      <div class="kpi-label">📅 Erros no Mês Atual</div>
+      <div class="kpi-value" id="kMesAtual">{{ kpis.erros_mes_atual }}</div>
+      <div class="kpi-sub">{{ mes_atual_rotulo if kpis.erros_mes_atual > 0 else "nenhum erro" }}</div>
+    </div>
+  </div>
+
+  <div class="alert-section">
+    <div class="section-title">ALERTAS CRÍTICOS</div>
+    <div class="alert-grid">
+      <div class="alert-card{% if alertas.pico_erros.critico %} critical{% endif %}">
+        <div class="alert-label">{{ alertas.pico_erros.titulo }}</div>
+        <div class="alert-value" id="alertPicoValor">{{ alertas.pico_erros.valor }}</div>
+        <div class="alert-sub" id="alertPicoSub">{{ alertas.pico_erros.subtexto }}</div>
+      </div>
+      <div class="alert-card{% if alertas.categoria_dominante.critico %} critical{% endif %}">
+        <div class="alert-label">{{ alertas.categoria_dominante.titulo }}</div>
+        <div class="alert-value" id="alertCategoriaValor">{{ alertas.categoria_dominante.valor }}</div>
+        <div class="alert-sub" id="alertCategoriaSub">{{ alertas.categoria_dominante.subtexto }}</div>
+      </div>
+      <div class="alert-card{% if alertas.fornecedor_fora_padrao.critico %} critical{% endif %}">
+        <div class="alert-label">{{ alertas.fornecedor_fora_padrao.titulo }}</div>
+        <div class="alert-value" id="alertFornecedorValor">{{ alertas.fornecedor_fora_padrao.valor }}</div>
+        <div class="alert-sub" id="alertFornecedorSub">{{ alertas.fornecedor_fora_padrao.subtexto }}</div>
+      </div>
+      <div class="alert-card{% if alertas.remetente_alto_volume.critico %} critical{% endif %}">
+        <div class="alert-label">{{ alertas.remetente_alto_volume.titulo }}</div>
+        <div class="alert-value" id="alertRemetenteValor">{{ alertas.remetente_alto_volume.valor }}</div>
+        <div class="alert-sub" id="alertRemetenteSub">{{ alertas.remetente_alto_volume.subtexto }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Linha 2: Dois gráficos lado a lado -->
+  <div class="charts-grid">
+    <div class="card tall">
+      <h2>🏢 Top 5 Fornecedores com Mais Erros</h2>
+      <canvas id="chartTopForn"></canvas>
+    </div>
+    <div class="card tall">
+      <h2>🏷️ Erros por Categoria</h2>
+      <canvas id="chartCatBarras"></canvas>
+      <p class="nota">* Um erro pode ser contabilizado em mais de uma categoria</p>
+    </div>
+  </div>
+
+  <!-- Linha 3: Dois gráficos lado a lado -->
+  <div class="charts-grid">
+    <div class="card tall">
+      <h2>📈 Evolução de Erros por Mês</h2>
+      <canvas id="chartEvolucao"></canvas>
+    </div>
+    <div class="card tall">
+      <h2>👤 Top 5 Compradores com Mais Erros</h2>
+      <canvas id="chartTopCompradores"></canvas>
+    </div>
+  </div>
+
+  <div class="charts-grid-full">
+    <div class="card tall">
+      <h2>📨 Top 5 Remetentes com Mais Erros</h2>
+      <canvas id="chartTopRemetentes"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const allData   = {{ records_json | safe }};
+const categoriasConfig = {{ categorias_json | safe }};
+const catColors = {{ cores_json | safe }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
