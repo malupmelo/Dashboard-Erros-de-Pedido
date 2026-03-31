@@ -41,21 +41,55 @@ def init_db():
 
 
 def salvar_registros(registros: list[dict], nome_arquivo: str):
-    """Salva registros no banco evitando duplicatas por NF + PEDIDO."""
+    """Salva registros no banco garantindo unicidade por NF + PEDIDO."""
     conn = get_connection()
+    
+    # 1) Limpa duplicidades históricas que já existirem no banco
+    conn.execute(
+        """
+        DELETE FROM erros
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM erros
+            GROUP BY nf, pedido
+        )
+        """
+    )
+
+    # 2) Remove duplicidades dentro da própria importação (mantém a primeira ocorrência)
+    registros_unicos = {}
     for r in registros:
+        chave = (r["NF"], r["PEDIDO"])
+        if chave not in registros_unicos:
+            registros_unicos[chave] = r
+
+    # 3) Para cada chave importada, remove o existente e insere somente 1 registro
+    for r in registros_unicos.values():
         conn.execute(
             "DELETE FROM erros WHERE nf=? AND pedido=?",
             (r["NF"], r["PEDIDO"])
         )
-    for r in registros:
+    for r in registros_unicos.values():
         conn.execute(
             "INSERT INTO erros (nf, fornecedor, pedido, erro, data, comprador, assunto, remetente) VALUES (?,?,?,?,?,?,?,?)",
             (r["NF"], r["FORNECEDOR"], r["PEDIDO"], r["ERRO"], r["DATA"], r["COMPRADOR"], r["ASSUNTO"], r["REMETENTE"])
         )
+
+    # 4) Salvaguarda final: garante unicidade no estado final da tabela
+    conn.execute(
+        """
+        DELETE FROM erros
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM erros
+            GROUP BY nf, pedido
+        )
+        """
+    )
+
     conn.execute(
         "INSERT INTO importacoes (arquivo, registros) VALUES (?,?)",
-        (nome_arquivo, len(registros))
+        (nome_arquivo, len(registros_unicos))
     )
     conn.commit()
     conn.close()
