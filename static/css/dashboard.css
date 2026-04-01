@@ -58,6 +58,13 @@ header .badge-update {
   background: white; color: #0f3460; border: 1.5px solid #0f3460;
   border-radius: 6px; padding: 6px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
 }
+.btn-export {
+  background: #1a1a2e;
+  color: #fff;
+}
+.btn-export:hover {
+  background: #0f3460;
+}
 @media(max-width:1200px) {
   .filter-bar { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
   .filter-actions { grid-column: 1 / -1; justify-content: flex-start; }

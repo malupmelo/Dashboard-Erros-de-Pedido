@@ -16,7 +16,7 @@ import time
 import glob
 import os
 from flask import Flask
-from config import (
+from core.config import (
     HOST,
     PORT,
     DEBUG,
@@ -24,11 +24,14 @@ from config import (
     AUTO_REIMPORT_INTERVALO_SEGUNDOS,
     AUTO_REIMPORT_SOMENTE_SE_ALTERAR,
 )
-from database import init_db
-from importer import importar_excel, importar_pasta_data
-from routes import bp
+from core.database import init_db
+from services.importer import importar_excel, importar_pasta_data
+from web.routes import bp
+from web.auth import init_auth
 
 app = Flask(__name__)
+app.secret_key = 'dashboard-erros-chave-secreta-2024'
+init_auth(app)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.register_blueprint(bp)
 

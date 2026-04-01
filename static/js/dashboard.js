@@ -266,6 +266,32 @@ function aplicarFiltros() {
   atualizarDashboard();
 }
 
+function exportarPDF() {
+  const dataInicio = document.getElementById("dataInicio").value.trim();
+  const dataFim = document.getElementById("dataFim").value.trim();
+  const forn = document.getElementById("filtroForn").value;
+  const cat = document.getElementById("filtroCategoria").value;
+
+  if (dataInicio && !parseData(dataInicio)) {
+    alert("Data inicial inválida. Use DD/MM/AAAA.");
+    return;
+  }
+  if (dataFim && !parseData(dataFim)) {
+    alert("Data final inválida. Use DD/MM/AAAA.");
+    return;
+  }
+
+  const params = new URLSearchParams();
+  if (dataInicio) params.append("dataInicio", dataInicio);
+  if (dataFim) params.append("dataFim", dataFim);
+  if (forn) params.append("fornecedor", forn);
+  if (cat) params.append("categoria", cat);
+
+  const query = params.toString();
+  const url = query ? `/exportar-pdf?${query}` : "/exportar-pdf";
+  window.location.href = url;
+}
+
 async function atualizarDashboard() {
   const dataInicio = document.getElementById("dataInicio").value.trim();
   const dataFim    = document.getElementById("dataFim").value.trim();
