@@ -4,6 +4,7 @@
 
 import sqlite3
 from datetime import datetime
+import re
 from core.config import DB_PATH
 
 
@@ -11,6 +12,15 @@ def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _assunto_bloqueado(assunto: str) -> bool:
+    """Bloqueia assuntos que iniciam com RE/RES (com tolerância a espaços/pontuação)."""
+    s = (assunto or "").strip().upper()
+    if not s:
+        return False
+    s = re.sub(r"^[\s\-_:;,.]+", "", s)
+    return s.startswith("RE")
 
 
 def init_db():
@@ -41,6 +51,30 @@ def init_db():
     if "comprador_canonico" not in cols:
         conn.execute("ALTER TABLE erros ADD COLUMN comprador_canonico TEXT")
 
+    if "fornecedor_original" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN fornecedor_original TEXT")
+    if "fornecedor_normalizado" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN fornecedor_normalizado TEXT")
+    if "fornecedor_canonico" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN fornecedor_canonico TEXT")
+    if "codigo_fornecedor" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN codigo_fornecedor TEXT")
+    if "tipo_match_fornecedor" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN tipo_match_fornecedor TEXT")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fornecedores (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_fornecedor TEXT UNIQUE,
+            nome_oficial      TEXT NOT NULL,
+            nome_normalizado  TEXT NOT NULL
+        )
+    """)
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_fornecedores_nome_normalizado ON fornecedores(nome_normalizado)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS importacoes (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +91,14 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
     """Salva registros no banco garantindo unicidade por NF + PEDIDO."""
     conn = get_connection()
     agora_local = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 0) Limpeza defensiva global para impedir persistência histórica de RE/RES.
+    conn.execute(
+        """
+        DELETE FROM erros
+        WHERE upper(ltrim(coalesce(assunto, ''))) LIKE 'RE%'
+        """
+    )
     
     # 1) Limpa duplicidades históricas que já existirem no banco
     conn.execute(
@@ -73,6 +115,8 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
     # 2) Remove duplicidades dentro da própria importação (mantém a primeira ocorrência)
     registros_unicos = {}
     for r in registros:
+        if _assunto_bloqueado(r.get("ASSUNTO", "")):
+            continue
         chave = (r["NF"], r["PEDIDO"])
         if chave not in registros_unicos:
             registros_unicos[chave] = r
@@ -88,8 +132,9 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
             (
                 "INSERT INTO erros "
                 "(nf, fornecedor, pedido, erro, data, comprador, assunto, remetente, importado_em, "
-                "comprador_original, comprador_limpo, comprador_normalizado, comprador_canonico) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "comprador_original, comprador_limpo, comprador_normalizado, comprador_canonico, "
+                "fornecedor_original, fornecedor_normalizado, fornecedor_canonico, codigo_fornecedor, tipo_match_fornecedor) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             ),
             (
                 r["NF"],
@@ -105,6 +150,11 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
                 r.get("COMPRADOR_LIMPO", ""),
                 r.get("COMPRADOR_NORMALIZADO", ""),
                 r.get("COMPRADOR_CANONICO", ""),
+                r.get("FORNECEDOR_ORIGINAL", ""),
+                r.get("FORNECEDOR_NORMALIZADO", ""),
+                r.get("FORNECEDOR_CANONICO", ""),
+                r.get("CODIGO_FORNECEDOR", ""),
+                r.get("TIPO_MATCH_FORNECEDOR", ""),
             )
         )
 
@@ -117,6 +167,14 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
             FROM erros
             GROUP BY nf, pedido
         )
+        """
+    )
+
+    # 5) Salvaguarda final de regra de assunto (defesa em profundidade).
+    conn.execute(
+        """
+        DELETE FROM erros
+        WHERE upper(ltrim(coalesce(assunto, ''))) LIKE 'RE%'
         """
     )
 

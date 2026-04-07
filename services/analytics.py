@@ -115,12 +115,41 @@ def _resolver_aliases_remetentes(nomes: list[str]) -> dict[str, str]:
     return aliases
 
 
+def fornecedor_canonico_valido(valor: str) -> bool:
+    s = (valor or "").strip()
+    if not s:
+        return False
+
+    s_lower = s.lower()
+    if s.isdigit():
+        return False
+    if "@" in s or "\n" in s or "\r" in s:
+        return False
+    if "classificação: uso interno" in s_lower or "classificacao: uso interno" in s_lower:
+        return False
+    if "www." in s_lower or "cid:image" in s_lower:
+        return False
+    if s_upper := s.upper():
+        if s_upper in {"FORNECEDOR NAO CADASTRADO", "NAO INFORMADO", "NÃO INFORMADO"}:
+            return False
+
+    return True
+
+
+def fornecedor_canonico_registro(registro: dict) -> str:
+    fornecedor_canonico = (registro.get("fornecedor_canonico") or "").strip()
+    if fornecedor_canonico_valido(fornecedor_canonico):
+        return fornecedor_canonico
+    return ""
+
+
 def enriquecer_registros(registros: list[dict]) -> list[dict]:
     """Adiciona lista de categorias a cada registro."""
     remetentes_formatados = []
     for r in registros:
         r["categorias"] = categorizar(r["erro"])
         r["remetente_nome"] = formatar_remetente(r.get("remetente", ""))
+        r["fornecedor_exibicao"] = fornecedor_canonico_registro(r)
         comprador_canonico = (r.get("comprador_canonico") or "").strip()
         r["comprador_exibicao"] = comprador_canonico or r.get("comprador", "") or "Nao Informado"
         remetentes_formatados.append(r["remetente_nome"])
@@ -143,7 +172,11 @@ def calcular_kpis(registros: list[dict]) -> dict:
         return _kpis_vazios()
 
     # Contadores base
-    fornecedores = Counter(r["fornecedor"] for r in registros)
+    fornecedores = Counter(
+        r.get("fornecedor_exibicao") or fornecedor_canonico_registro(r)
+        for r in registros
+        if (r.get("fornecedor_exibicao") or fornecedor_canonico_registro(r))
+    )
     remetentes = Counter(r.get("remetente_nome") or formatar_remetente(r.get("remetente", "")) for r in registros)
 
     # Categorias — um erro pode contar em múltiplas
@@ -324,7 +357,11 @@ def calcular_alertas_criticos(
             "critico": percentual_categoria >= 40,
         }
 
-    fornecedores = Counter(r.get("fornecedor", "Não informado") for r in registros_filtrados)
+    fornecedores = Counter(
+        fornecedor_canonico_registro(r)
+        for r in registros_filtrados
+        if fornecedor_canonico_registro(r)
+    )
     fornecedores_criticos = [(nome, total) for nome, total in fornecedores.most_common() if total > limite_fornecedor]
     if fornecedores_criticos:
         fornecedor_nome, fornecedor_total = fornecedores_criticos[0]

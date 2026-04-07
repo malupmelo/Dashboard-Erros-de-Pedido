@@ -6,6 +6,7 @@
 // allData, catColors são variáveis globais vindas do HTML
 
 let chartTopForn, chartCatBarras, chartEvolucao, chartTopCompradores, chartTopRemetentes;
+const FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO = "CODIGO_NAO_ENCONTRADO::";
 
 // ── Categorização (espelha config.py) ─────────────────
 const CATEGORIAS = Array.isArray(categoriasConfig) ? categoriasConfig : [];
@@ -29,6 +30,32 @@ function counter(arr, key) {
   const c = {};
   arr.forEach(r => { c[r[key]] = (c[r[key]] || 0) + 1; });
   return c;
+}
+
+function fornecedorCanonicoRegistro(registro) {
+  return (registro.fornecedor_exibicao || registro.fornecedor_canonico || "").trim();
+}
+
+function codigoNaoEncontradoSelecionado(valorFiltro) {
+  return (valorFiltro || "").startsWith(FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO);
+}
+
+function codigoDoFiltroNaoEncontrado(valorFiltro) {
+  if (!codigoNaoEncontradoSelecionado(valorFiltro)) return "";
+  return valorFiltro.substring(FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO.length).trim();
+}
+
+function registroCorrespondeFornecedorFiltro(registro, valorFiltro) {
+  if (!valorFiltro) return true;
+
+  const codigoFiltro = codigoDoFiltroNaoEncontrado(valorFiltro);
+  if (codigoFiltro) {
+    const codigoRegistro = String(registro.codigo_fornecedor || "").replace(/\s+/g, "").trim();
+    const tipoMatch = String(registro.tipo_match_fornecedor || "").trim();
+    return tipoMatch === "codigo_nao_encontrado" && codigoRegistro === codigoFiltro;
+  }
+
+  return fornecedorCanonicoRegistro(registro) === valorFiltro;
 }
 
 // ── Renderização principal ────────────────────────────
@@ -61,7 +88,15 @@ function atualizarAlertas(alertas) {
 function renderGraficos(data, dashboardData) {
   const topForn = dashboardData
     ? dashboardData.top_fornecedores
-    : Object.entries(counter(data, "fornecedor")).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    : (() => {
+        const m = {};
+        data.forEach(r => {
+          const nome = fornecedorCanonicoRegistro(r);
+          if (!nome) return;
+          m[nome] = (m[nome] || 0) + 1;
+        });
+        return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      })();
 
   const catSorted = dashboardData
     ? dashboardData.categorias
@@ -259,7 +294,7 @@ function filtrar() {
     const cats = r.categorias || categorizar(r.erro);
     if (dtInicio && dtRegistro && dtRegistro < dtInicio) return false;
     if (dtFim    && dtRegistro && dtRegistro > dtFim)    return false;
-    if (forn && r.fornecedor !== forn) return false;
+    if (!registroCorrespondeFornecedorFiltro(r, forn)) return false;
     if (cat  && !cats.includes(cat)) return false;
     return true;
   });

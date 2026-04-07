@@ -37,7 +37,7 @@
       <select id="filtroForn">
         <option value="">Todos</option>
         {% for f in fornecedores_lista %}
-        <option value="{{ f }}">{{ f }}</option>
+        <option value="{{ f.value }}">{{ f.label }}</option>
         {% endfor %}
       </select>
     </div>

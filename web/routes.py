@@ -5,15 +5,25 @@
 # ─────────────────────────────────────────────
 
 import json
+import re
 from collections import Counter
 from datetime import datetime
 from io import BytesIO
 from flask import Blueprint, render_template, jsonify, request, send_file
-from core.database import buscar_registros, buscar_ultima_importacao, contar_registros
-from services.analytics import enriquecer_registros, calcular_kpis, calcular_evolucao, calcular_alertas_criticos, parse_data_br
+from core.database import buscar_registros, buscar_ultima_importacao, contar_registros, get_connection
+from services.analytics import (
+    enriquecer_registros,
+    calcular_kpis,
+    calcular_evolucao,
+    calcular_alertas_criticos,
+    parse_data_br,
+    fornecedor_canonico_registro,
+    fornecedor_canonico_valido,
+)
 from core.config import CORES_CATEGORIAS, CATEGORIAS
 
 bp = Blueprint("main", __name__)
+_FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO = "CODIGO_NAO_ENCONTRADO::"
 
 @bp.after_request
 # prevent browser caching of dashboard page
@@ -33,7 +43,7 @@ def _filtrar_registros(data_inicio: str, data_fim: str, fornecedor: str, categor
 
     registros_contexto = []
     for r in registros:
-        if fornecedor and r["fornecedor"] != fornecedor:
+        if fornecedor and not _registro_corresponde_fornecedor_filtro(r, fornecedor):
             continue
         if categoria and categoria not in r.get("categorias", []):
             continue
@@ -58,24 +68,129 @@ def _resumo_filtros(data_inicio: str, data_fim: str, fornecedor: str, categoria:
     if data_fim:
         partes.append(f"Até: {data_fim}")
     if fornecedor:
-        partes.append(f"Fornecedor: {fornecedor}")
+        partes.append(f"Fornecedor: {_rotulo_fornecedor_filtro(fornecedor)}")
     if categoria:
         partes.append(f"Categoria: {categoria}")
     return " | ".join(partes) if partes else "Sem filtros aplicados"
 
 
-def _fornecedor_valido_para_filtro(valor: str) -> bool:
-    """Evita exibir no filtro textos que não representam fornecedores."""
-    s = (valor or "").strip()
-    if not s:
+def _listar_fornecedores_canonicos() -> list[dict[str, str]]:
+    """Lista fornecedores para dropdown: canônicos confiáveis + códigos não encontrados."""
+    conn = get_connection()
+    try:
+        rows_confiaveis = conn.execute(
+            """
+            SELECT DISTINCT f.nome_oficial AS fornecedor_canonico
+            FROM erros e
+            INNER JOIN fornecedores f
+                ON upper(trim(e.fornecedor_canonico)) = upper(trim(f.nome_oficial))
+            WHERE e.fornecedor_canonico IS NOT NULL
+              AND trim(e.fornecedor_canonico) <> ''
+              AND e.tipo_match_fornecedor IN ('codigo_exato', 'nome_encontrado')
+              AND f.nome_oficial IS NOT NULL
+              AND trim(f.nome_oficial) <> ''
+            """
+        ).fetchall()
+
+        rows_codigos_nao_encontrados = conn.execute(
+            """
+            SELECT DISTINCT trim(codigo_fornecedor) AS codigo_fornecedor
+            FROM erros
+            WHERE tipo_match_fornecedor = 'codigo_nao_encontrado'
+              AND codigo_fornecedor IS NOT NULL
+              AND trim(codigo_fornecedor) <> ''
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    fornecedores_canonicos = sorted(
+        {
+            row["fornecedor_canonico"].strip()
+            for row in rows_confiaveis
+            if _fornecedor_valido_dropdown(row["fornecedor_canonico"])
+        }
+    )
+
+    codigos = sorted(
+        {
+            re.sub(r"\s+", "", (row["codigo_fornecedor"] or ""))
+            for row in rows_codigos_nao_encontrados
+            if re.sub(r"\s+", "", (row["codigo_fornecedor"] or "")).isdigit()
+        }
+    )
+
+    opcoes: list[dict[str, str]] = [
+        {"value": nome, "label": nome}
+        for nome in fornecedores_canonicos
+    ]
+    opcoes.extend(
+        {
+            "value": _valor_filtro_codigo_nao_encontrado(codigo),
+            "label": f"{codigo} - FORNECEDOR NAO CADASTRADO",
+        }
+        for codigo in codigos
+    )
+    return opcoes
+
+
+def _valor_filtro_codigo_nao_encontrado(codigo: str) -> str:
+    return f"{_FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO}{codigo}"
+
+
+def _codigo_filtro_codigo_nao_encontrado(valor_filtro: str) -> str:
+    if not (valor_filtro or "").startswith(_FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO):
+        return ""
+    return valor_filtro[len(_FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO):].strip()
+
+
+def _rotulo_fornecedor_filtro(valor_filtro: str) -> str:
+    codigo = _codigo_filtro_codigo_nao_encontrado(valor_filtro)
+    if codigo:
+        return f"{codigo} - FORNECEDOR NAO CADASTRADO"
+    return valor_filtro
+
+
+def _registro_corresponde_fornecedor_filtro(registro: dict, valor_filtro: str) -> bool:
+    codigo_filtro = _codigo_filtro_codigo_nao_encontrado(valor_filtro)
+    if codigo_filtro:
+        codigo_registro = re.sub(r"\s+", "", (registro.get("codigo_fornecedor") or "").strip())
+        tipo_match = (registro.get("tipo_match_fornecedor") or "").strip()
+        return tipo_match == "codigo_nao_encontrado" and codigo_registro == codigo_filtro
+
+    fornecedor_canonico = fornecedor_canonico_registro(registro)
+    return fornecedor_canonico == valor_filtro
+
+
+def _fornecedor_valido_dropdown(valor: str) -> bool:
+    """Validação estrita para exibição no dropdown (evita lixo, emails, códigos e nomes pessoais)."""
+    if not fornecedor_canonico_valido(valor):
         return False
 
-    s_lower = s.lower()
-    if "@" in s or "\n" in s or "\r" in s:
+    s = (valor or "").strip()
+    s_upper = s.upper()
+
+    if len(s) < 3 or len(s) > 80:
         return False
-    if "classificação: uso interno" in s_lower or "classificacao: uso interno" in s_lower:
+    if re.search(r"[\r\n\t]", s):
         return False
-    if "www." in s_lower or "cid:image" in s_lower:
+    if re.search(r"\b(?:RE|RES|ENC|FW)\s*:", s_upper):
+        return False
+    if re.fullmatch(r"[0-9\-\./\s]+", s):
+        return False
+
+    termos_empresa = {
+        "LTDA", "EIRELI", "S/A", "SA", "ME", "EPP", "CIA", "COMPANHIA",
+        "COMERCIO", "COMERCIAL", "INDUSTRIA", "INDUSTRIAL", "SERVICOS", "SOLUCOES",
+        "DISTRIBUIDORA", "TRANSPORTES", "LOGISTICA", "TECNOLOGIA", "EQUIPAMENTOS",
+        "IMPORTACAO", "EXPORTACAO", "CENTRAL", "MATERIAIS", "SISTEMAS", "MOTORES",
+    }
+    tokens = [t for t in re.split(r"[^A-Z0-9]+", s_upper) if t]
+    tem_termo_empresa = any(t in termos_empresa for t in tokens)
+
+    # Heurística: nome pessoal típico (2-4 palavras alfabéticas e sem termo empresarial).
+    somente_letras = re.findall(r"[A-ZÀ-Ý]+", s_upper)
+    if not tem_termo_empresa and 2 <= len(somente_letras) <= 4 and " " in s_upper:
         return False
 
     return True
@@ -271,7 +386,7 @@ def _gerar_pdf_relatorio(
         linhas.append([
             (r.get("data") or "")[:10],
             str(r.get("nf") or "")[:16],
-            str(r.get("fornecedor") or "")[:18],
+            str(fornecedor_canonico_registro(r) or "")[:18],
             str(r.get("pedido") or "")[:12],
             str(r.get("erro") or "")[:42],
             str(r.get("comprador") or "")[:16],
@@ -326,13 +441,7 @@ def index():
         total_banco=contar_registros(),
         data_min=registros[0]["data"]  if registros else "",
         data_max=registros[-1]["data"] if registros else "",
-        fornecedores_lista=sorted(
-            set(
-                r["fornecedor"]
-                for r in registros
-                if _fornecedor_valido_para_filtro(r.get("fornecedor", ""))
-            )
-        ),
+        fornecedores_lista=_listar_fornecedores_canonicos(),
         cores_json=json.dumps(CORES_CATEGORIAS, ensure_ascii=False),
         mes_atual_rotulo=datetime.now().strftime("%m/%Y"),
         now_timestamp=int(time())
@@ -360,7 +469,11 @@ def api_dashboard_data():
     kpis = calcular_kpis(registros_filtrados)
     
     # Top fornecedores
-    top_fornecedores = Counter(r["fornecedor"] for r in registros_filtrados).most_common(5)
+    top_fornecedores = Counter(
+        fornecedor_canonico_registro(r)
+        for r in registros_filtrados
+        if fornecedor_canonico_registro(r)
+    ).most_common(5)
     
     # Categorias
     cat_counter = Counter()
@@ -434,7 +547,11 @@ def exportar_pdf():
     )
 
     kpis = calcular_kpis(registros_filtrados)
-    top_fornecedores = Counter(r["fornecedor"] for r in registros_filtrados).most_common(5)
+    top_fornecedores = Counter(
+        fornecedor_canonico_registro(r)
+        for r in registros_filtrados
+        if fornecedor_canonico_registro(r)
+    ).most_common(5)
     top_compradores = Counter(
         r.get("comprador_exibicao", r.get("comprador", "Nao Informado"))
         for r in registros_filtrados

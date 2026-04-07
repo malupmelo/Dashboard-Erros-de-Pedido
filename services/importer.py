@@ -5,12 +5,14 @@
 import os
 import glob
 import re
+import unicodedata
 import pandas as pd
 from datetime import datetime
 import tempfile
 import shutil
 import time
 from core.database import salvar_registros
+from services.fornecedor_service import buscar_fornecedor_por_codigo, buscar_fornecedor_por_nome
 from services.utils_nomes import agrupar_compradores, preparar_campos_comprador
 from core.config import (
     PASTA_DATA,
@@ -46,6 +48,66 @@ def _assunto_permitido(valor: str) -> bool:
     if not s:
         return True
     return not (s.startswith("RE") or s.startswith("RES"))
+
+
+def _normalizar_fornecedor_texto(texto: str) -> str:
+    s = (texto or "").strip().lower()
+    if not s:
+        return ""
+
+    sem_acentos = unicodedata.normalize("NFKD", s)
+    sem_acentos = "".join(ch for ch in sem_acentos if not unicodedata.combining(ch))
+    sem_pontuacao = re.sub(r"[^a-z0-9\s]", " ", sem_acentos)
+    tokens = re.sub(r"\s+", " ", sem_pontuacao).strip().split(" ")
+    termos_remover = {"ltda", "sa", "me", "eireli", "epp"}
+    filtrados = [t for t in tokens if t and t not in termos_remover]
+    return " ".join(filtrados)
+
+
+def eh_codigo(valor: str) -> bool:
+    """Retorna True quando o valor contem apenas digitos (ignorando espacos)."""
+    bruto = valor or ""
+    sem_espacos = re.sub(r"\s+", "", bruto)
+    return bool(sem_espacos) and sem_espacos.isdigit()
+
+
+def _enriquecer_campos_fornecedor(df: pd.DataFrame) -> pd.DataFrame:
+    """Enriquece registros de fornecedor detectando codigo ou nome no campo FORNECEDOR."""
+    fornecedor_original = df["FORNECEDOR"].fillna("").astype(str).str.strip()
+    fornecedor_normalizado = fornecedor_original.apply(_normalizar_fornecedor_texto)
+    fornecedor_canonico = []
+    tipo_match_fornecedor = []
+    codigos_resolvidos = []
+
+    for original, normalizado in zip(fornecedor_original.tolist(), fornecedor_normalizado.tolist()):
+        if eh_codigo(original):
+            codigo_limpo = re.sub(r"\s+", "", original)
+            encontrado = buscar_fornecedor_por_codigo(codigo_limpo)
+            if encontrado:
+                fornecedor_canonico.append(encontrado["nome_oficial"])
+                tipo_match_fornecedor.append("codigo_exato")
+                codigos_resolvidos.append(encontrado["codigo_fornecedor"])
+            else:
+                fornecedor_canonico.append("FORNECEDOR NAO CADASTRADO")
+                tipo_match_fornecedor.append("codigo_nao_encontrado")
+                codigos_resolvidos.append(codigo_limpo)
+        else:
+            encontrado = buscar_fornecedor_por_nome(normalizado)
+            if encontrado:
+                fornecedor_canonico.append(encontrado["nome_oficial"])
+                tipo_match_fornecedor.append("nome_encontrado")
+                codigos_resolvidos.append((encontrado.get("codigo_fornecedor") or "").strip())
+            else:
+                fornecedor_canonico.append(original)
+                tipo_match_fornecedor.append("nome_nao_encontrado")
+                codigos_resolvidos.append("")
+
+    df["FORNECEDOR_ORIGINAL"] = fornecedor_original
+    df["FORNECEDOR_NORMALIZADO"] = fornecedor_normalizado
+    df["FORNECEDOR_CANONICO"] = fornecedor_canonico
+    df["CODIGO_FORNECEDOR"] = codigos_resolvidos
+    df["TIPO_MATCH_FORNECEDOR"] = tipo_match_fornecedor
+    return df
 
 
 def _enriquecer_campos_comprador(df: pd.DataFrame) -> pd.DataFrame:
@@ -253,6 +315,8 @@ def processar_arquivo(caminho: str) -> pd.DataFrame:
     descartadas = before_valid - len(df)
     if descartadas > 0:
         print(f"    [AVISO] {descartadas} linha(s) descartada(s) por fornecedor/NF/PEDIDO inválidos")
+
+    df = _enriquecer_campos_fornecedor(df)
 
     before_comprador = len(df)
     df = _enriquecer_campos_comprador(df)
