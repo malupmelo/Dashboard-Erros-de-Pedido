@@ -121,6 +121,8 @@ def enriquecer_registros(registros: list[dict]) -> list[dict]:
     for r in registros:
         r["categorias"] = categorizar(r["erro"])
         r["remetente_nome"] = formatar_remetente(r.get("remetente", ""))
+        comprador_canonico = (r.get("comprador_canonico") or "").strip()
+        r["comprador_exibicao"] = comprador_canonico or r.get("comprador", "") or "Nao Informado"
         remetentes_formatados.append(r["remetente_nome"])
 
     aliases_remetentes = _resolver_aliases_remetentes(remetentes_formatados)
@@ -179,7 +181,7 @@ def calcular_kpis(registros: list[dict]) -> dict:
         "categorias":         sorted(cat_counter.items(), key=lambda x: -x[1]),
 
         # ── Novos ────────────────────────────────────
-        "top_compradores":    Counter(r["comprador"] for r in registros).most_common(5),
+        "top_compradores":    Counter(r.get("comprador_exibicao", r.get("comprador", "Nao Informado")) for r in registros).most_common(5),
         "top_remetentes":    remetentes.most_common(5),
     }
 

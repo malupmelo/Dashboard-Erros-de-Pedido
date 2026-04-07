@@ -64,6 +64,23 @@ def _resumo_filtros(data_inicio: str, data_fim: str, fornecedor: str, categoria:
     return " | ".join(partes) if partes else "Sem filtros aplicados"
 
 
+def _fornecedor_valido_para_filtro(valor: str) -> bool:
+    """Evita exibir no filtro textos que não representam fornecedores."""
+    s = (valor or "").strip()
+    if not s:
+        return False
+
+    s_lower = s.lower()
+    if "@" in s or "\n" in s or "\r" in s:
+        return False
+    if "classificação: uso interno" in s_lower or "classificacao: uso interno" in s_lower:
+        return False
+    if "www." in s_lower or "cid:image" in s_lower:
+        return False
+
+    return True
+
+
 def _gerar_pdf_relatorio(
     data_inicio: str,
     data_fim: str,
@@ -309,7 +326,13 @@ def index():
         total_banco=contar_registros(),
         data_min=registros[0]["data"]  if registros else "",
         data_max=registros[-1]["data"] if registros else "",
-        fornecedores_lista=sorted(set(r["fornecedor"] for r in registros)),
+        fornecedores_lista=sorted(
+            set(
+                r["fornecedor"]
+                for r in registros
+                if _fornecedor_valido_para_filtro(r.get("fornecedor", ""))
+            )
+        ),
         cores_json=json.dumps(CORES_CATEGORIAS, ensure_ascii=False),
         mes_atual_rotulo=datetime.now().strftime("%m/%Y"),
         now_timestamp=int(time())
@@ -358,7 +381,10 @@ def api_dashboard_data():
     )
     
     # Top compradores
-    top_compradores = Counter(r["comprador"] for r in registros_filtrados).most_common(5)
+    top_compradores = Counter(
+        r.get("comprador_exibicao", r.get("comprador", "Nao Informado"))
+        for r in registros_filtrados
+    ).most_common(5)
     top_remetentes = Counter(r.get("remetente_nome", "Não informado") for r in registros_filtrados).most_common(5)
     
     return jsonify({
@@ -409,7 +435,10 @@ def exportar_pdf():
 
     kpis = calcular_kpis(registros_filtrados)
     top_fornecedores = Counter(r["fornecedor"] for r in registros_filtrados).most_common(5)
-    top_compradores = Counter(r["comprador"] for r in registros_filtrados).most_common(5)
+    top_compradores = Counter(
+        r.get("comprador_exibicao", r.get("comprador", "Nao Informado"))
+        for r in registros_filtrados
+    ).most_common(5)
     top_remetentes = Counter(r.get("remetente_nome", "Não informado") for r in registros_filtrados).most_common(5)
 
     cat_counter = Counter()

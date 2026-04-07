@@ -4,12 +4,14 @@
 
 import os
 import glob
+import re
 import pandas as pd
 from datetime import datetime
 import tempfile
 import shutil
 import time
 from core.database import salvar_registros
+from services.utils_nomes import agrupar_compradores, preparar_campos_comprador
 from core.config import (
     PASTA_DATA,
     ARQUIVO_FLUXO_EMAILS,
@@ -19,6 +21,48 @@ from core.config import (
 
 COLUNAS = ["NF", "FORNECEDOR", "PEDIDO", "ERRO", "DATA", "COMPRADOR", "ASSUNTO", "REMETENTE"]
 COLUNAS_OBRIGATORIAS = {"NF", "FORNECEDOR", "PEDIDO", "ERRO", "DATA", "COMPRADOR", "REMETENTE"}
+
+
+def _fornecedor_valido(valor: str) -> bool:
+    """Valida se o campo FORNECEDOR parece conter um nome de fornecedor real."""
+    s = (valor or "").strip()
+    if not s:
+        return False
+
+    s_lower = s.lower()
+    if "@" in s or "\n" in s or "\r" in s:
+        return False
+    if "classificação: uso interno" in s_lower or "classificacao: uso interno" in s_lower:
+        return False
+    if "www." in s_lower or "cid:image" in s_lower:
+        return False
+
+    return True
+
+
+def _assunto_permitido(valor: str) -> bool:
+    """Bloqueia assuntos que iniciam com RE/RES (ex.: respostas de e-mail)."""
+    s = (valor or "").strip().upper()
+    if not s:
+        return True
+    return not (s.startswith("RE") or s.startswith("RES"))
+
+
+def _enriquecer_campos_comprador(df: pd.DataFrame) -> pd.DataFrame:
+    """Cria campos de comprador (original/limpo/normalizado/canonico) com agrupamento."""
+    comprador_info = df["COMPRADOR"].astype(str).apply(preparar_campos_comprador)
+    df["COMPRADOR_ORIGINAL"] = comprador_info.apply(lambda x: x["comprador_original"])
+    df["COMPRADOR_LIMPO"] = comprador_info.apply(lambda x: x["comprador_limpo"])
+    df["COMPRADOR_NORMALIZADO"] = comprador_info.apply(lambda x: x["comprador_normalizado"])
+
+    mapa_canonico = agrupar_compradores(df["COMPRADOR_LIMPO"].tolist())
+    df["COMPRADOR_CANONICO"] = df["COMPRADOR_LIMPO"].apply(
+        lambda n: mapa_canonico.get(n, n) if n and n != "Nao Informado" else "Nao Informado"
+    )
+
+    # Mantem compatibilidade com campos existentes que usam COMPRADOR
+    df["COMPRADOR"] = df["COMPRADOR_CANONICO"].str.upper()
+    return df
 
 
 def _log_metadados_arquivo(caminho_abs: str):
@@ -193,6 +237,29 @@ def processar_arquivo(caminho: str) -> pd.DataFrame:
         df["ASSUNTO"] = ""
 
     df = df[COLUNAS].dropna(how="all").fillna("")
+
+    before_assunto = len(df)
+    df = df[df["ASSUNTO"].astype(str).apply(_assunto_permitido)]
+    descartadas_assunto = before_assunto - len(df)
+    if descartadas_assunto > 0:
+        print(f"    [AVISO] {descartadas_assunto} linha(s) descartada(s) por assunto iniciado com RE/RES")
+
+    before_valid = len(df)
+    df = df[
+        (df["NF"].astype(str).str.strip() != "")
+        & (df["PEDIDO"].astype(str).str.strip() != "")
+        & (df["FORNECEDOR"].astype(str).apply(_fornecedor_valido))
+    ]
+    descartadas = before_valid - len(df)
+    if descartadas > 0:
+        print(f"    [AVISO] {descartadas} linha(s) descartada(s) por fornecedor/NF/PEDIDO inválidos")
+
+    before_comprador = len(df)
+    df = _enriquecer_campos_comprador(df)
+    compradores_nao_informados = int((df["COMPRADOR_CANONICO"] == "Nao Informado").sum())
+    if compradores_nao_informados > 0:
+        print(f"    [AVISO] {compradores_nao_informados} linha(s) sem comprador identificável (marcadas como NAO INFORMADO)")
+
     after_drop = len(df)
     print(f"    {after_drop} linhas após eliminar linhas vazias")
     datas_convertidas = df["DATA"].apply(_parse_data_segura)

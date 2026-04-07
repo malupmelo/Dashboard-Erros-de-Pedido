@@ -3,6 +3,7 @@
 # ─────────────────────────────────────────────
 
 import sqlite3
+from datetime import datetime
 from core.config import DB_PATH
 
 
@@ -28,6 +29,18 @@ def init_db():
             importado_em TEXT DEFAULT (datetime('now'))
         )
     """)
+
+    # Migração incremental: garante colunas novas em bases antigas.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(erros)").fetchall()}
+    if "comprador_original" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN comprador_original TEXT")
+    if "comprador_limpo" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN comprador_limpo TEXT")
+    if "comprador_normalizado" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN comprador_normalizado TEXT")
+    if "comprador_canonico" not in cols:
+        conn.execute("ALTER TABLE erros ADD COLUMN comprador_canonico TEXT")
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS importacoes (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +56,7 @@ def init_db():
 def salvar_registros(registros: list[dict], nome_arquivo: str):
     """Salva registros no banco garantindo unicidade por NF + PEDIDO."""
     conn = get_connection()
+    agora_local = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # 1) Limpa duplicidades históricas que já existirem no banco
     conn.execute(
@@ -71,8 +85,27 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
         )
     for r in registros_unicos.values():
         conn.execute(
-            "INSERT INTO erros (nf, fornecedor, pedido, erro, data, comprador, assunto, remetente) VALUES (?,?,?,?,?,?,?,?)",
-            (r["NF"], r["FORNECEDOR"], r["PEDIDO"], r["ERRO"], r["DATA"], r["COMPRADOR"], r["ASSUNTO"], r["REMETENTE"])
+            (
+                "INSERT INTO erros "
+                "(nf, fornecedor, pedido, erro, data, comprador, assunto, remetente, importado_em, "
+                "comprador_original, comprador_limpo, comprador_normalizado, comprador_canonico) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            ),
+            (
+                r["NF"],
+                r["FORNECEDOR"],
+                r["PEDIDO"],
+                r["ERRO"],
+                r["DATA"],
+                r["COMPRADOR"],
+                r["ASSUNTO"],
+                r["REMETENTE"],
+                agora_local,
+                r.get("COMPRADOR_ORIGINAL", ""),
+                r.get("COMPRADOR_LIMPO", ""),
+                r.get("COMPRADOR_NORMALIZADO", ""),
+                r.get("COMPRADOR_CANONICO", ""),
+            )
         )
 
     # 4) Salvaguarda final: garante unicidade no estado final da tabela
@@ -88,8 +121,8 @@ def salvar_registros(registros: list[dict], nome_arquivo: str):
     )
 
     conn.execute(
-        "INSERT INTO importacoes (arquivo, registros) VALUES (?,?)",
-        (nome_arquivo, len(registros_unicos))
+        "INSERT INTO importacoes (arquivo, registros, importado_em) VALUES (?,?,?)",
+        (nome_arquivo, len(registros_unicos), agora_local)
     )
     conn.commit()
     conn.close()

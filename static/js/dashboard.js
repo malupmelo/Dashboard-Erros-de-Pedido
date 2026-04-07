@@ -159,7 +159,10 @@ function renderGraficos(data, dashboardData) {
     ? dashboardData.top_compradores
     : (() => {
         const m = {};
-        data.forEach(r => { m[r.comprador] = (m[r.comprador] || 0) + 1; });
+        data.forEach(r => {
+          const nome = r.comprador_exibicao || r.comprador_canonico || r.comprador || "Nao Informado";
+          m[nome] = (m[nome] || 0) + 1;
+        });
         return Object.entries(m).sort((a,b) => b[1] - a[1]).slice(0,5);
       })();
 
