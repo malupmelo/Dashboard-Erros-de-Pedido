@@ -122,46 +122,53 @@ HTML_LOGIN = """
 
 
 def init_auth(app):
-    @app.before_request
-    def proteger_rotas():
-        endpoint = request.endpoint or ""
-        caminho = request.path or ""
+  @app.after_request
+  def desabilitar_cache(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
-        if endpoint in {"login", "logout", "static"} or caminho.startswith("/static/"):
-            return None
+  @app.before_request
+  def proteger_rotas():
+    endpoint = request.endpoint or ""
+    caminho = request.path or ""
 
-        usuario_sessao = session.get("usuario")
-        logado = bool(session.get("logado"))
-        usuario_valido = bool(usuario_sessao) and usuario_sessao in USUARIOS
+    if endpoint in {"login", "logout", "static"} or caminho.startswith("/static/"):
+      return None
 
-        if not logado or not usuario_valido:
-            session.clear()
-            return redirect(url_for("login"))
+    usuario_sessao = session.get("usuario")
+    logado = bool(session.get("logado"))
+    usuario_valido = bool(usuario_sessao) and usuario_sessao in USUARIOS
 
-        return None
+    if not logado or not usuario_valido:
+      session.clear()
+      return redirect(url_for("login"))
 
-    @app.route("/login", methods=["GET", "POST"])
-    def login():
-      if request.method == "GET" and session.get("logado"):
-        session.clear()
+    return None
 
-        if request.method == "POST":
-            usuario = (request.form.get("usuario") or "").strip()
-            senha = request.form.get("senha") or ""
+  @app.route("/login", methods=["GET", "POST"])
+  def login():
+    if request.method == "GET" and session.get("logado"):
+      session.clear()
 
-            if USUARIOS.get(usuario) == senha:
-                session["logado"] = True
-                session["usuario"] = usuario
-                return redirect(url_for("main.index"))
+    if request.method == "POST":
+      usuario = (request.form.get("usuario") or "").strip()
+      senha = request.form.get("senha") or ""
 
-            return render_template_string(
-                HTML_LOGIN,
-                erro="Usuário ou senha inválidos.",
-            )
+      if USUARIOS.get(usuario) == senha:
+        session["logado"] = True
+        session["usuario"] = usuario
+        return redirect(url_for("main.index"))
 
-        return render_template_string(HTML_LOGIN, erro=None)
+      return render_template_string(
+        HTML_LOGIN,
+        erro="Usuário ou senha inválidos.",
+      )
 
-    @app.route("/logout")
-    def logout():
+    return render_template_string(HTML_LOGIN, erro=None)
+
+  @app.route("/logout")
+  def logout():
         session.clear()
         return redirect(url_for("login"))
