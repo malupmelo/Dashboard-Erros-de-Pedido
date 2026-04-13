@@ -3,9 +3,9 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from flask import Flask
-from routes import bp
-from database import init_db, buscar_registros
-from analytics import enriquecer_registros, calcular_kpis
+from web.routes import bp
+from core.database import init_db, buscar_registros
+from services.analytics import enriquecer_registros, calcular_kpis
 
 # Setup Flask
 app = Flask(__name__)

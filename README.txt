@@ -5,14 +5,18 @@
 
 ## ESTRUTURA DO PROJETO
 
-  app.py              → ponto de entrada — só inicializa a aplicação
-  config.py           → todas as configurações (cores, categorias, porta...)
-  database.py         → operações com o banco de dados SQLite
-  importer.py         → leitura e importação da planilha oficial Fluxo_Emails
-  analytics.py        → cálculo de KPIs e categorização de erros
-  routes.py           → rotas do servidor web e API
+  app.py              → ponto de entrada e CLI
+  web/app_factory.py   → criação da aplicação Flask e registro de blueprints
+  core/config.py       → todas as configurações (cores, categorias, porta...)
+  core/database.py     → operações com o banco de dados SQLite
+  services/importer.py → leitura e importação da planilha oficial Fluxo_Emails
+  services/analytics.py → cálculo de KPIs e categorização de erros
+  services/background_sync.py → sincronização automática da pasta data/
+  web/routes.py        → rotas do servidor web e API
+  web/auth.py          → autenticação e proteção das rotas
   templates/
     dashboard.html    → estrutura HTML do dashboard
+    login.html        → tela de login
   static/
     css/
       dashboard.css   → estilos visuais do dashboard
@@ -24,6 +28,8 @@
     Fluxo_Emails.xlsx.xlsx  → planilha oficial utilizada no dashboard
   requirements.txt    → dependências Python
   erros_pedido.db     → banco de dados (criado automaticamente)
+
+Os arquivos antigos na raiz do projeto continuam como compatibilidade legada para scripts que ainda usam imports como `import analytics` ou `import database`.
 
 ---
 

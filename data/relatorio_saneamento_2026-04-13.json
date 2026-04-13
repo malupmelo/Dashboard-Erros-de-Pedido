@@ -1,0 +1,355 @@
+﻿{
+  "resumo": {
+    "pedidos_vazios_total": 9,
+    "codigos_sem_cadastro_total": 12,
+    "fornecedores_ambiguos_total": 29
+  },
+  "listas": {
+    "pedidos_vazios": [
+      {
+        "id": 106061,
+        "nf": "35755",
+        "pedido": "",
+        "fornecedor": "LCT",
+        "comprador": "JANAINA",
+        "erro": "VERIFICAR O VALOR UNITARIO",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "15/01/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106067,
+        "nf": "91236",
+        "pedido": "",
+        "fornecedor": "LOJA DOS PARAFUSOS",
+        "comprador": "HORACIO",
+        "erro": "VERIFICAR TEM ITEM COM 4 ICMS COM ICMS IVA YD SEM ICMS CJ",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "15/01/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106088,
+        "nf": "83162",
+        "pedido": "",
+        "fornecedor": "MARCOS DANILLO VILELA MARCOS DANILLO VILELA",
+        "comprador": "JULIANA",
+        "erro": "ALTERAR O IVA PRA YG falta recebimento no pc",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "21/01/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106107,
+        "nf": "CTE 289",
+        "pedido": "",
+        "fornecedor": "ESTA COMO",
+        "comprador": "ITALO BARBOSA",
+        "erro": "CTE ENTRADA DE MECADORIA -ALTERAR O IVA PARA C0",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "28/01/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106114,
+        "nf": "7690",
+        "pedido": "",
+        "fornecedor": "COMPRA DE OLEO DIESSEL",
+        "comprador": "JULIANA",
+        "erro": "INFORMAR O PC PARA ESTA NOTA FISCAL VALOR TOTAL DA NF R$ 54.300,00",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "26/01/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106132,
+        "nf": "16156",
+        "pedido": "",
+        "fornecedor": "BOMBETEC BOMBAS QUIMICAS LTDA",
+        "comprador": "JOSE",
+        "erro": "FATURADO MAIOR QUE O PC",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "03/02/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106136,
+        "nf": "527398",
+        "pedido": "",
+        "fornecedor": "NORTEL",
+        "comprador": "JULIANA",
+        "erro": "INFORMAR QUA ╔ PC PARA RECEBER A NF",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "04/02/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106143,
+        "nf": "141",
+        "pedido": "",
+        "fornecedor": "FOI FATURADA  PARA VIVIX GOIANA  E O PC FEITO  PAR",
+        "comprador": "GUILHERME",
+        "erro": "A VIVIX MATRIZ RECIFE",
+        "assunto": "ERRO DE PEDIDO",
+        "data": "05/02/2026",
+        "remetente": "LAZARO"
+      },
+      {
+        "id": 106436,
+        "nf": "655600",
+        "pedido": "",
+        "fornecedor": "AV1209",
+        "comprador": "",
+        "erro": "Sem PC na NF e no Inbound",
+        "assunto": "erro",
+        "data": "31/03/2026",
+        "remetente": "Jefferson Soares"
+      }
+    ],
+    "codigos_sem_cadastro": [
+      {
+        "id": 94992,
+        "nf": "2466900",
+        "pedido": "4500417396",
+        "fornecedor": "300033575",
+        "codigo_fornecedor": "300033575",
+        "data": "07/04/2026"
+      },
+      {
+        "id": 127766,
+        "nf": "96102",
+        "pedido": "4500416925",
+        "fornecedor": "96102",
+        "codigo_fornecedor": "96102",
+        "data": "02/03/2026"
+      },
+      {
+        "id": 127946,
+        "nf": "74384",
+        "pedido": "4500416842",
+        "fornecedor": "300028388",
+        "codigo_fornecedor": "300028388",
+        "data": "07/04/2026"
+      },
+      {
+        "id": 127948,
+        "nf": "6766",
+        "pedido": "4500417682",
+        "fornecedor": "300033587",
+        "codigo_fornecedor": "300033587",
+        "data": "07/04/2026"
+      },
+      {
+        "id": 127952,
+        "nf": "000595",
+        "pedido": "4500418399",
+        "fornecedor": "300032664",
+        "codigo_fornecedor": "300032664",
+        "data": "07/04/2026"
+      },
+      {
+        "id": 127955,
+        "nf": "768",
+        "pedido": "4500412225",
+        "fornecedor": "300030818",
+        "codigo_fornecedor": "300030818",
+        "data": "09/04/2026"
+      },
+      {
+        "id": 127958,
+        "nf": "000063",
+        "pedido": "4500415979",
+        "fornecedor": "300032084",
+        "codigo_fornecedor": "300032084",
+        "data": "10/04/2026"
+      },
+      {
+        "id": 127961,
+        "nf": "32688",
+        "pedido": "4500414883",
+        "fornecedor": "1017037",
+        "codigo_fornecedor": "1017037",
+        "data": "13/04/2026"
+      },
+      {
+        "id": 127962,
+        "nf": "20118",
+        "pedido": "4500400110",
+        "fornecedor": "1016182",
+        "codigo_fornecedor": "1016182",
+        "data": "13/04/2026"
+      },
+      {
+        "id": 127963,
+        "nf": "316476",
+        "pedido": "4500403988",
+        "fornecedor": "1009433",
+        "codigo_fornecedor": "1009433",
+        "data": "13/04/2026"
+      },
+      {
+        "id": 127964,
+        "nf": "63071",
+        "pedido": "4500403624",
+        "fornecedor": "1009457",
+        "codigo_fornecedor": "1009457",
+        "data": "13/04/2026"
+      },
+      {
+        "id": 127966,
+        "nf": "2939",
+        "pedido": "4500417996",
+        "fornecedor": "1014727",
+        "codigo_fornecedor": "1014727",
+        "data": "13/04/2026"
+      }
+    ],
+    "fornecedores_ambiguos": [
+      {
+        "nome_normalizado": "transmissora alianca de energia ele",
+        "qtd_codigos": 14,
+        "codigos": "1018469, 300031065, 300031063, 1018468, 1018455, 1018457, 1018467, 1018470, 1018461, 1018495, 1018459, 1018453, 300031064, 300031456"
+      },
+      {
+        "nome_normalizado": "carvalima transportes",
+        "qtd_codigos": 8,
+        "codigos": "1004590, 1006085, 300020531, 1003355, 1017266, 1006338, 1008010, 1004589"
+      },
+      {
+        "nome_normalizado": "f marinho transportes",
+        "qtd_codigos": 7,
+        "codigos": "300030819, 1000000980, 1018315, 1000000942, 1000000944, 1000000970, 300031878"
+      },
+      {
+        "nome_normalizado": "gerdau acos longos s a",
+        "qtd_codigos": 3,
+        "codigos": "1012976, 1012977, 300032859"
+      },
+      {
+        "nome_normalizado": "gotemburgo veiculos",
+        "qtd_codigos": 3,
+        "codigos": "1017962, 1017934, 1019697"
+      },
+      {
+        "nome_normalizado": "rodonaves transportes e encomendas",
+        "qtd_codigos": 3,
+        "codigos": "1017937, 1014303, 1000001050"
+      },
+      {
+        "nome_normalizado": "white martins gases industriais do",
+        "qtd_codigos": 3,
+        "codigos": "1011722, 1003651, 1014381"
+      },
+      {
+        "nome_normalizado": "1telecom servicos de tecnologia em",
+        "qtd_codigos": 2,
+        "codigos": "1015717, 300033549"
+      },
+      {
+        "nome_normalizado": "adf translog transporte e logistica",
+        "qtd_codigos": 2,
+        "codigos": "1000000872, 1016911"
+      },
+      {
+        "nome_normalizado": "algar telecom s a",
+        "qtd_codigos": 2,
+        "codigos": "300030607, 1017337"
+      },
+      {
+        "nome_normalizado": "atiaia comercializadora de energia",
+        "qtd_codigos": 2,
+        "codigos": "300025237, 1010406"
+      },
+      {
+        "nome_normalizado": "atiaia energia s a",
+        "qtd_codigos": 2,
+        "codigos": "1005881, 300031103"
+      },
+      {
+        "nome_normalizado": "brenntag quimica brasil",
+        "qtd_codigos": 2,
+        "codigos": "1013316, 1013431"
+      },
+      {
+        "nome_normalizado": "btl transportes e logistica eirelli",
+        "qtd_codigos": 2,
+        "codigos": "1017849, 1000000860"
+      },
+      {
+        "nome_normalizado": "colaus logistica",
+        "qtd_codigos": 2,
+        "codigos": "300032830, 300033606"
+      },
+      {
+        "nome_normalizado": "companhia brasileira de vidros plan",
+        "qtd_codigos": 2,
+        "codigos": "30013002, 1008755"
+      },
+      {
+        "nome_normalizado": "copel geracao e transmissao s a",
+        "qtd_codigos": 2,
+        "codigos": "1018476, 1018465"
+      },
+      {
+        "nome_normalizado": "dimensional brasil solucoes",
+        "qtd_codigos": 2,
+        "codigos": "1019075, 300030031"
+      },
+      {
+        "nome_normalizado": "empresa amazonense de transmissao",
+        "qtd_codigos": 2,
+        "codigos": "1018625, 1018480"
+      },
+      {
+        "nome_normalizado": "energisa para transmissora de energ",
+        "qtd_codigos": 2,
+        "codigos": "1020351, 1020203"
+      },
+      {
+        "nome_normalizado": "energisa tocantins transmissora de",
+        "qtd_codigos": 2,
+        "codigos": "300031510, 300029825"
+      },
+      {
+        "nome_normalizado": "grt auditoria de terceiros",
+        "qtd_codigos": 2,
+        "codigos": "1015603, 300030070"
+      },
+      {
+        "nome_normalizado": "haver boecker latinoamericana maq",
+        "qtd_codigos": 2,
+        "codigos": "300031773, 300032302"
+      },
+      {
+        "nome_normalizado": "imbravidros industria brasileira de",
+        "qtd_codigos": 2,
+        "codigos": "300030181, 1010841"
+      },
+      {
+        "nome_normalizado": "ingram micro brasil",
+        "qtd_codigos": 2,
+        "codigos": "1004617, 1016363"
+      },
+      {
+        "nome_normalizado": "panatlantica s a",
+        "qtd_codigos": 2,
+        "codigos": "300033302, 300033382"
+      },
+      {
+        "nome_normalizado": "pernambuco distribuidora atacadista",
+        "qtd_codigos": 2,
+        "codigos": "1002434, 300028359"
+      },
+      {
+        "nome_normalizado": "tora transportes industriais",
+        "qtd_codigos": 2,
+        "codigos": "1012813, 1000000861"
+      },
+      {
+        "nome_normalizado": "veneza equipamentos pesados s a",
+        "qtd_codigos": 2,
+        "codigos": "1016751, 300030302"
+      }
+    ]
+  }
+}

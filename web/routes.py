@@ -531,6 +531,111 @@ def api_kpis():
     })
 
 
+@bp.route("/api/qualidade-fornecedores", methods=["GET"])
+def api_qualidade_fornecedores():
+    """Retorna métricas de qualidade de identificação de fornecedores."""
+    conn = get_connection()
+    try:
+        total = conn.execute("SELECT COUNT(*) AS total FROM erros").fetchone()["total"] or 0
+
+        rows_por_tipo = conn.execute(
+            """
+            SELECT COALESCE(tipo_match_fornecedor, '') AS tipo, COUNT(*) AS quantidade
+            FROM erros
+            GROUP BY COALESCE(tipo_match_fornecedor, '')
+            """
+        ).fetchall()
+
+        codigo_exato = 0
+        nome_encontrado = 0
+        alias_manual = 0
+        fuzzy = 0
+        nao_encontrado = 0
+        acima_90 = 0
+        entre_82_90 = 0
+        entre_70_82 = 0
+
+        for row in rows_por_tipo:
+            tipo = (row["tipo"] or "").strip()
+            quantidade = int(row["quantidade"] or 0)
+
+            if tipo == "codigo_exato":
+                codigo_exato += quantidade
+                continue
+            if tipo == "nome_encontrado":
+                nome_encontrado += quantidade
+                continue
+            if tipo == "alias_manual":
+                alias_manual += quantidade
+                continue
+            if tipo in {"codigo_nao_encontrado", "nome_nao_encontrado"}:
+                nao_encontrado += quantidade
+                continue
+
+            if tipo.startswith("fuzzy_"):
+                fuzzy += quantidade
+                m = re.match(r"^fuzzy_(\d+)$", tipo)
+                if not m:
+                    continue
+                score = int(m.group(1))
+                if score >= 90:
+                    acima_90 += quantidade
+                elif score >= 82:
+                    entre_82_90 += quantidade
+                elif score >= 70:
+                    entre_70_82 += quantidade
+
+        resolvidos = codigo_exato + nome_encontrado + alias_manual + fuzzy
+        percentual_resolvido = round((resolvidos / total) * 100, 1) if total else 0.0
+
+        rows_nao_encontrados = conn.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(trim(fornecedor_original), ''), '(vazio)') AS fornecedor_original,
+                COALESCE(NULLIF(trim(fornecedor_normalizado), ''), '(vazio)') AS fornecedor_normalizado,
+                COUNT(*) AS ocorrencias
+            FROM erros
+            WHERE tipo_match_fornecedor = 'nome_nao_encontrado'
+            GROUP BY
+                COALESCE(NULLIF(trim(fornecedor_original), ''), '(vazio)'),
+                COALESCE(NULLIF(trim(fornecedor_normalizado), ''), '(vazio)')
+            ORDER BY ocorrencias DESC, fornecedor_normalizado ASC
+            LIMIT 20
+            """
+        ).fetchall()
+
+        nao_encontrados = [
+            {
+                "fornecedor_original": row["fornecedor_original"],
+                "fornecedor_normalizado": row["fornecedor_normalizado"],
+                "ocorrencias": int(row["ocorrencias"] or 0),
+            }
+            for row in rows_nao_encontrados
+        ]
+    finally:
+        conn.close()
+
+    return jsonify(
+        {
+            "total": int(total),
+            "por_tipo": {
+                "codigo_exato": int(codigo_exato),
+                "nome_encontrado": int(nome_encontrado),
+                "alias_manual": int(alias_manual),
+                "fuzzy": int(fuzzy),
+                "nao_encontrado": int(nao_encontrado),
+            },
+            "percentual_resolvido": percentual_resolvido,
+            "fuzzy_scores": {
+                "acima_90": int(acima_90),
+                "entre_82_90": int(entre_82_90),
+                "entre_70_82": int(entre_70_82),
+            },
+            "nao_encontrados": nao_encontrados,
+        }
+    )
+
+
 @bp.route("/exportar-pdf", methods=["GET"])
 def exportar_pdf():
     """Exporta o relatório em PDF respeitando os filtros ativos."""

@@ -76,6 +76,18 @@ def init_db():
     )
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS fornecedor_aliases (
+            alias_normalizado TEXT PRIMARY KEY,
+            codigo_fornecedor TEXT NOT NULL,
+            origem TEXT DEFAULT 'manual'
+        )
+    """)
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aliases_normalizado ON fornecedor_aliases(alias_normalizado)"
+    )
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS importacoes (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             arquivo      TEXT,

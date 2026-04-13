@@ -1,29 +1,18 @@
-import re
-import unicodedata
 from pathlib import Path
+import sys
 
 import pandas as pd
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from core.database import get_connection
+from services.normalizer import normalizar_nome_fornecedor
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ARQUIVO_BASE_FORNECEDORES = BASE_DIR / "data" / "base_fornecedores.xlsx"
-TERMOS_REMOVER = {"ltda", "sa", "me", "eireli", "epp"}
-
-
-def normalizar_nome_fornecedor(nome: str) -> str:
-    texto = (nome or "").strip().lower()
-    if not texto:
-        return ""
-
-    texto = unicodedata.normalize("NFKD", texto)
-    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
-    texto = re.sub(r"[^a-z0-9\s]", " ", texto)
-    texto = re.sub(r"\s+", " ", texto).strip()
-
-    tokens = [t for t in texto.split(" ") if t and t not in TERMOS_REMOVER]
-    return " ".join(tokens)
 
 
 def importar_base_fornecedores() -> None:

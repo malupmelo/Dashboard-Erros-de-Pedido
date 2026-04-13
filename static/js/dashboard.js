@@ -8,6 +8,14 @@
 let chartTopForn, chartCatBarras, chartEvolucao, chartTopCompradores, chartTopRemetentes;
 const FILTRO_CODIGO_NAO_ENCONTRADO_PREFIXO = "CODIGO_NAO_ENCONTRADO::";
 
+const CORES_QUALIDADE = {
+  codigo_exato: "#166534",
+  nome_encontrado: "#22c55e",
+  alias_manual: "#2563eb",
+  fuzzy: "#f59e0b",
+  nao_encontrado: "#dc2626"
+};
+
 // ── Categorização (espelha config.py) ─────────────────
 const CATEGORIAS = Array.isArray(categoriasConfig) ? categoriasConfig : [];
 
@@ -83,6 +91,128 @@ function atualizarAlertas(alertas) {
     subEl.textContent = alerta.subtexto;
     cardEl.classList.toggle("critical", Boolean(alerta.critico));
   });
+}
+
+function percentual(parte, total) {
+  if (!total) return 0;
+  return (parte / total) * 100;
+}
+
+function formatarPercentual(valor) {
+  return `${Number(valor || 0).toFixed(1)}%`;
+}
+
+function atualizarPainelQualidade(payload) {
+  const total = Number(payload?.total || 0);
+  const porTipo = payload?.por_tipo || {};
+  const fuzzyScores = payload?.fuzzy_scores || {};
+  const naoEncontrados = Array.isArray(payload?.nao_encontrados) ? payload.nao_encontrados : [];
+
+  const mapa = [
+    { chave: "codigo_exato", rotulo: "Código exato", cor: CORES_QUALIDADE.codigo_exato },
+    { chave: "nome_encontrado", rotulo: "Nome exato", cor: CORES_QUALIDADE.nome_encontrado },
+    { chave: "alias_manual", rotulo: "Alias manual", cor: CORES_QUALIDADE.alias_manual },
+    { chave: "fuzzy", rotulo: "Fuzzy", cor: CORES_QUALIDADE.fuzzy },
+    { chave: "nao_encontrado", rotulo: "Não encontrado", cor: CORES_QUALIDADE.nao_encontrado }
+  ];
+
+  const percentualEl = document.getElementById("qualidadePercentual");
+  if (percentualEl) {
+    percentualEl.textContent = formatarPercentual(payload?.percentual_resolvido || 0);
+  }
+
+  const progressEl = document.getElementById("qualidadeProgress");
+  if (progressEl) {
+    const segmentos = {
+      codigo_exato: progressEl.querySelector(".seg-codigo"),
+      nome_encontrado: progressEl.querySelector(".seg-nome"),
+      alias_manual: progressEl.querySelector(".seg-alias"),
+      fuzzy: progressEl.querySelector(".seg-fuzzy"),
+      nao_encontrado: progressEl.querySelector(".seg-nao")
+    };
+
+    mapa.forEach(({ chave }) => {
+      const valor = Number(porTipo[chave] || 0);
+      const width = total ? percentual(valor, total) : 0;
+      if (segmentos[chave]) {
+        segmentos[chave].style.width = `${width.toFixed(2)}%`;
+        segmentos[chave].title = `${chave}: ${valor} (${formatarPercentual(width)})`;
+      }
+    });
+  }
+
+  const legendaEl = document.getElementById("qualidadeLegenda");
+  if (legendaEl) {
+    legendaEl.innerHTML = mapa.map(({ chave, rotulo, cor }) => {
+      const valor = Number(porTipo[chave] || 0);
+      const pct = total ? percentual(valor, total) : 0;
+      return `
+        <div class="qualidade-legenda-item">
+          <span class="qualidade-dot" style="background:${cor}"></span>
+          <span>${rotulo}: <strong>${valor}</strong> (${formatarPercentual(pct)})</span>
+        </div>
+      `;
+    }).join("");
+  }
+
+  const fuzzyEl = document.getElementById("qualidadeFuzzyScores");
+  if (fuzzyEl) {
+    fuzzyEl.textContent =
+      `Fuzzy scores: >=90 (${Number(fuzzyScores.acima_90 || 0)}), ` +
+      `82-89 (${Number(fuzzyScores.entre_82_90 || 0)}), ` +
+      `70-81 (${Number(fuzzyScores.entre_70_82 || 0)})`;
+  }
+
+  const listaEl = document.getElementById("listaNaoEncontradosTop10");
+  if (listaEl) {
+    const top10 = naoEncontrados.slice(0, 10);
+    if (!top10.length) {
+      listaEl.innerHTML = "<li>Sem registros não identificados.</li>";
+    } else {
+      listaEl.innerHTML = top10.map((item) => {
+        const original = item.fornecedor_original || "(vazio)";
+        const normalizado = item.fornecedor_normalizado || "(vazio)";
+        const ocorrencias = Number(item.ocorrencias || 0);
+        return `<li><strong>${ocorrencias}x</strong> ${original} <em>(${normalizado})</em></li>`;
+      }).join("");
+    }
+  }
+}
+
+function configurarBotaoSugerirAliases() {
+  const btn = document.getElementById("btnExecutarSugerirAliases");
+  const comandoEl = document.getElementById("comandoSugerirAliases");
+  if (!btn || !comandoEl) return;
+
+  btn.addEventListener("click", async () => {
+    comandoEl.hidden = false;
+    const comando = comandoEl.textContent || "python scripts/sugerir_aliases.py";
+    try {
+      await navigator.clipboard.writeText(comando);
+      btn.textContent = "Comando copiado";
+      setTimeout(() => {
+        btn.textContent = "Executar sugerir_aliases.py";
+      }, 1500);
+    } catch (_) {
+      btn.textContent = "Comando exibido";
+      setTimeout(() => {
+        btn.textContent = "Executar sugerir_aliases.py";
+      }, 1500);
+    }
+  });
+}
+
+async function carregarQualidadeFornecedores() {
+  try {
+    const response = await fetch("/api/qualidade-fornecedores");
+    if (!response.ok) {
+      throw new Error(`Falha ao carregar qualidade: ${response.status}`);
+    }
+    const payload = await response.json();
+    atualizarPainelQualidade(payload);
+  } catch (error) {
+    console.error("Erro ao carregar painel de qualidade de fornecedores:", error);
+  }
 }
 
 function renderGraficos(data, dashboardData) {
@@ -380,3 +510,5 @@ function limparFiltros() {
 
 // ── Render inicial ────────────────────────────────────
 render(allData);
+configurarBotaoSugerirAliases();
+carregarQualidadeFornecedores();

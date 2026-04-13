@@ -5,14 +5,19 @@
 import os
 import glob
 import re
-import unicodedata
 import pandas as pd
 from datetime import datetime
 import tempfile
 import shutil
 import time
-from core.database import salvar_registros
-from services.fornecedor_service import buscar_fornecedor_por_codigo, buscar_fornecedor_por_nome
+from core.database import get_connection, salvar_registros
+from services.fornecedor_service import (
+    buscar_fornecedor_fuzzy,
+    buscar_fornecedor_por_alias,
+    buscar_fornecedor_por_codigo,
+    buscar_fornecedor_por_nome,
+)
+from services.normalizer import normalizar_nome_fornecedor as _normalizar_fornecedor_texto
 from services.utils_nomes import agrupar_compradores, preparar_campos_comprador
 from core.config import (
     PASTA_DATA,
@@ -50,19 +55,6 @@ def _assunto_permitido(valor: str) -> bool:
     return not (s.startswith("RE") or s.startswith("RES"))
 
 
-def _normalizar_fornecedor_texto(texto: str) -> str:
-    s = (texto or "").strip().lower()
-    if not s:
-        return ""
-
-    sem_acentos = unicodedata.normalize("NFKD", s)
-    sem_acentos = "".join(ch for ch in sem_acentos if not unicodedata.combining(ch))
-    sem_pontuacao = re.sub(r"[^a-z0-9\s]", " ", sem_acentos)
-    tokens = re.sub(r"\s+", " ", sem_pontuacao).strip().split(" ")
-    termos_remover = {"ltda", "sa", "me", "eireli", "epp"}
-    filtrados = [t for t in tokens if t and t not in termos_remover]
-    return " ".join(filtrados)
-
 
 def eh_codigo(valor: str) -> bool:
     """Retorna True quando o valor contem apenas digitos (ignorando espacos)."""
@@ -79,28 +71,47 @@ def _enriquecer_campos_fornecedor(df: pd.DataFrame) -> pd.DataFrame:
     tipo_match_fornecedor = []
     codigos_resolvidos = []
 
-    for original, normalizado in zip(fornecedor_original.tolist(), fornecedor_normalizado.tolist()):
-        if eh_codigo(original):
-            codigo_limpo = re.sub(r"\s+", "", original)
-            encontrado = buscar_fornecedor_por_codigo(codigo_limpo)
-            if encontrado:
-                fornecedor_canonico.append(encontrado["nome_oficial"])
-                tipo_match_fornecedor.append("codigo_exato")
-                codigos_resolvidos.append(encontrado["codigo_fornecedor"])
+    conn = get_connection()
+
+    try:
+        for original, normalizado in zip(fornecedor_original.tolist(), fornecedor_normalizado.tolist()):
+            if eh_codigo(original):
+                codigo_limpo = re.sub(r"\s+", "", original)
+                encontrado = buscar_fornecedor_por_codigo(codigo_limpo, conn=conn)
+                if encontrado:
+                    fornecedor_canonico.append(encontrado["nome_oficial"])
+                    tipo_match_fornecedor.append("codigo_exato")
+                    codigos_resolvidos.append(encontrado["codigo_fornecedor"])
+                else:
+                    fornecedor_canonico.append("FORNECEDOR NAO CADASTRADO")
+                    tipo_match_fornecedor.append("codigo_nao_encontrado")
+                    codigos_resolvidos.append(codigo_limpo)
             else:
-                fornecedor_canonico.append("FORNECEDOR NAO CADASTRADO")
-                tipo_match_fornecedor.append("codigo_nao_encontrado")
-                codigos_resolvidos.append(codigo_limpo)
-        else:
-            encontrado = buscar_fornecedor_por_nome(normalizado)
-            if encontrado:
-                fornecedor_canonico.append(encontrado["nome_oficial"])
-                tipo_match_fornecedor.append("nome_encontrado")
-                codigos_resolvidos.append((encontrado.get("codigo_fornecedor") or "").strip())
-            else:
-                fornecedor_canonico.append(original)
-                tipo_match_fornecedor.append("nome_nao_encontrado")
-                codigos_resolvidos.append("")
+                encontrado = buscar_fornecedor_por_nome(normalizado, conn=conn)
+                if encontrado:
+                    fornecedor_canonico.append(encontrado["nome_oficial"])
+                    tipo_match_fornecedor.append("nome_encontrado")
+                    codigos_resolvidos.append((encontrado.get("codigo_fornecedor") or "").strip())
+                    continue
+
+                encontrado_alias = buscar_fornecedor_por_alias(normalizado, conn=conn)
+                if encontrado_alias:
+                    fornecedor_canonico.append(encontrado_alias["nome_oficial"])
+                    tipo_match_fornecedor.append("alias_manual")
+                    codigos_resolvidos.append((encontrado_alias.get("codigo_fornecedor") or "").strip())
+                    continue
+
+                encontrado_fuzzy, score, tipo_fuzzy = buscar_fornecedor_fuzzy(normalizado, threshold=82, conn=conn)
+                if encontrado_fuzzy:
+                    fornecedor_canonico.append(encontrado_fuzzy["nome_oficial"])
+                    tipo_match_fornecedor.append(f"fuzzy_{score}")
+                    codigos_resolvidos.append((encontrado_fuzzy.get("codigo_fornecedor") or "").strip())
+                else:
+                    fornecedor_canonico.append(original)
+                    tipo_match_fornecedor.append("nome_nao_encontrado")
+                    codigos_resolvidos.append("")
+    finally:
+        conn.close()
 
     df["FORNECEDOR_ORIGINAL"] = fornecedor_original
     df["FORNECEDOR_NORMALIZADO"] = fornecedor_normalizado

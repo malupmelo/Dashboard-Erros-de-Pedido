@@ -9,8 +9,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from database import buscar_registros
-from analytics import categorizar
+from core.database import buscar_registros
+from services.analytics import categorizar
 from collections import Counter
 
 # Buscar todos os registros
@@ -50,13 +50,13 @@ for r in erros_com_iva_lower:
         erros_iva_nao_categorizados.append((r["erro"], cats))
 
 if erros_iva_nao_categorizados:
-    print(f"\n⚠️  {len(erros_iva_nao_categorizados)} erros com 'iva' que NÃO foram categorizados como IVA:")
+    print(f"\n[!] {len(erros_iva_nao_categorizados)} erros com 'iva' que NAO foram categorizados como IVA:")
     for erro, cats in erros_iva_nao_categorizados[:10]:
-        print(f"  • ERRO: {erro[:70]}")
-        print(f"    CATEGORIAS ATRIBUÍDAS: {cats}")
+        print(f"  - ERRO: {erro[:70]}")
+        print(f"    CATEGORIAS ATRIBUIDAS: {cats}")
         print()
 else:
-    print("\n✓ Todos os erros com 'iva' foram categorizados como IVA")
+    print("\n[OK] Todos os erros com 'iva' foram categorizados como IVA")
 
 # Amostra de erros classificados como "Outros"
 print("\n" + "=" * 80)
@@ -72,7 +72,7 @@ for i, (erro, cats) in enumerate(erros_outros[:30], 1):
 print("\n" + "=" * 80)
 print("ANÁLISE DE PALAVRAS-CHAVE POR CATEGORIA:")
 print("=" * 80)
-from config import CATEGORIAS
+from core.config import CATEGORIAS
 for cat_nome, cat_keywords in CATEGORIAS:
     print(f"\n{cat_nome}:")
     print(f"  Palavras-chave: {cat_keywords}")

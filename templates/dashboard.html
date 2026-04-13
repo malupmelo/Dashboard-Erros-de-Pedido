@@ -139,6 +139,38 @@
     </div>
   </div>
 
+  <div class="charts-grid-full">
+    <div class="card" id="cardQualidadeFornecedores">
+      <h2>✅ Qualidade de Fornecedores</h2>
+
+      <div class="qualidade-headline">
+        <div class="qualidade-percentual" id="qualidadePercentual">--%</div>
+        <div class="qualidade-sub">identificados</div>
+      </div>
+
+      <div class="qualidade-progress" id="qualidadeProgress">
+        <div class="seg seg-codigo" style="width: 0%"></div>
+        <div class="seg seg-nome" style="width: 0%"></div>
+        <div class="seg seg-alias" style="width: 0%"></div>
+        <div class="seg seg-fuzzy" style="width: 0%"></div>
+        <div class="seg seg-nao" style="width: 100%"></div>
+      </div>
+
+      <div class="qualidade-legenda" id="qualidadeLegenda"></div>
+
+      <div class="qualidade-fuzzy" id="qualidadeFuzzyScores"></div>
+
+      <details class="qualidade-collapse" id="qualidadeNaoEncontrados">
+        <summary>Top 10 fornecedores não identificados</summary>
+        <div class="qualidade-actions">
+          <button class="btn-outline" type="button" id="btnExecutarSugerirAliases">Executar sugerir_aliases.py</button>
+          <span class="qualidade-comando" id="comandoSugerirAliases" hidden>python scripts/sugerir_aliases.py</span>
+        </div>
+        <ul class="qualidade-lista" id="listaNaoEncontradosTop10"></ul>
+      </details>
+    </div>
+  </div>
+
 </div>
 
 <script>

@@ -12,65 +12,19 @@
 
 import argparse
 import threading
-import time
-import glob
-import os
-from flask import Flask
+from web.app_factory import create_app
 from core.config import (
     HOST,
     PORT,
     DEBUG,
-    PASTA_DATA,
     AUTO_REIMPORT_INTERVALO_SEGUNDOS,
     AUTO_REIMPORT_SOMENTE_SE_ALTERAR,
 )
 from core.database import init_db
 from services.importer import importar_excel, importar_pasta_data
-from web.routes import bp
-from web.auth import init_auth
+from services.background_sync import reimportar_em_background
 
-app = Flask(__name__)
-app.secret_key = 'dashboard-erros-chave-secreta-2024'
-init_auth(app)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.register_blueprint(bp)
-
-
-def _snapshot_planilhas() -> dict[str, tuple[float, int]]:
-    """Gera um snapshot simples dos arquivos .xlsx para detectar alterações."""
-    snapshot = {}
-    padrao = os.path.join(PASTA_DATA, "*.xlsx")
-    for caminho in sorted(glob.glob(padrao)):
-        try:
-            stat = os.stat(caminho)
-            snapshot[os.path.basename(caminho)] = (stat.st_mtime, stat.st_size)
-        except OSError:
-            continue
-    return snapshot
-
-
-def reimportar_em_background():
-    """Sincroniza a pasta data/ em segundo plano.
-
-    Se configurado, só reimporta quando detectar mudança em algum .xlsx.
-    """
-    ultimo_snapshot = None
-    while True:
-        try:
-            snapshot_atual = _snapshot_planilhas()
-
-            if AUTO_REIMPORT_SOMENTE_SE_ALTERAR and ultimo_snapshot == snapshot_atual:
-                time.sleep(AUTO_REIMPORT_INTERVALO_SEGUNDOS)
-                continue
-
-            print("\n[REIMPORT] Sincronizando planilhas automaticamente...")
-            importar_pasta_data()
-            ultimo_snapshot = snapshot_atual
-            print("[OK] Sincronizacao automatica concluida!")
-        except Exception as e:
-            print(f"[AVISO] Erro na sincronizacao automatica: {e}")
-
-        time.sleep(AUTO_REIMPORT_INTERVALO_SEGUNDOS)
+app = create_app()
 
 
 if __name__ == "__main__":

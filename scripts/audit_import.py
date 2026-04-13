@@ -10,8 +10,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pandas as pd
-import importer
-from database import init_db, get_connection
+import services.importer as importer
+from core.database import init_db, get_connection
 
 # ensure database initialized
 init_db()
@@ -33,14 +33,6 @@ for f in files:
     except Exception as e:
         print(f"Erro processando {f}: {e}")
         continue
-
-print("\nConsolidando planilhas...")
-paths = [os.path.join(importer.PASTA_DATA, f) for f in files]
-df_consol, reg_por_arquivo = importer.consolidar_planilhas(paths)
-print("---- resumo consolidação")
-print("Linhas por arquivo:", reg_por_arquivo)
-print("Total antes de deduplicação:", len(pd.concat([importer.processar_arquivo(p) for p in paths], ignore_index=True)))
-print("Total depois deduplicação:", len(df_consol))
 
 print("\nInserindo no banco usando importar_pasta_data()")
 imported_count = importer.importar_pasta_data()

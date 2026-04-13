@@ -8,8 +8,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from database import buscar_registros
-from analytics import categorizar
+from core.database import buscar_registros
+from services.analytics import categorizar
 from collections import Counter
 
 registros = buscar_registros()
